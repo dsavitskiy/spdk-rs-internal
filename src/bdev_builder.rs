@@ -179,6 +179,7 @@ where
                 blocklen: self.blocklen.expect("Bdeb block length must be set"),
                 phys_blocklen: Default::default(),
                 blockcnt: self.blockcnt.expect("Bdeb block count must be set"),
+                split_on_write_unit: true,
                 write_unit_size: Default::default(),
                 acwu: Default::default(),
                 required_alignment: self
@@ -204,6 +205,7 @@ where
                 max_active_zones: Default::default(),
                 optimal_open_zones: Default::default(),
                 media_events: Default::default(),
+                reset_io_drain_timeout: 5,
                 module: self.module.as_ptr(),
                 fn_table: null_mut::<spdk_bdev_fn_table>(),
                 internal: Default::default(),

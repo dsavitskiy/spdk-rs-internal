@@ -63,9 +63,10 @@ git submodule update --init --recursive
 
 Configure and build it:
 ```
-./configure --enable-debug --target-arch=nehalem --without-shared \
-    --without-isal --with-crypto --with-uring --disable-unit-tests \
-    --disable-tests --with-fio=$(which fio | sed s';bin/fio;include;')
+AS=yasm ./configure --enable-debug --target-arch=nehalem --without-shared \
+    --with-crypto --with-uring --disable-unit-tests \
+    --disable-tests
+        
 make
 ```
 
