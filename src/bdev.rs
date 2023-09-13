@@ -32,6 +32,8 @@ use crate::{
         spdk_bdev_module_release_bdev,
         spdk_bdev_register,
         spdk_bdev_unregister,
+        SPDK_BDEV_CLAIM_EXCL_WRITE,
+        SPDK_BDEV_CLAIM_NONE,
     },
     BdevIo,
     BdevModule,
@@ -110,7 +112,27 @@ where
         }
     }
 
+    /// Returns claim module raw pointer.
+    fn claim_module_ptr(&self) -> *mut spdk_bdev_module {
+        unsafe {
+            let b = self.as_inner_ref().internal;
+            match b.claim_type {
+                SPDK_BDEV_CLAIM_NONE => std::ptr::null_mut(),
+                SPDK_BDEV_CLAIM_EXCL_WRITE => b.claim.v1.module,
+                _ => {
+                    let c = (*b.claim.v2.claims.tqh_first);
+                    assert!(
+                        c.link.tqe_next.is_null(),
+                        "Multiple claims are not supported"
+                    );
+                    c.module
+                }
+            }
+        }
+    }
+
     /// Returns by a Bdev module who has claimed this Bdev.
+    /// TODO: must returns a list of claims or an iterator of claims.
     pub fn claimed_by_module(&self) -> Option<BdevModule> {
         let ptr = self.claim_module_ptr();
         if ptr.is_null() {
@@ -121,6 +143,7 @@ where
     }
 
     /// Returns by a name of Bdev module who has claimed this Bdev.
+    /// TODO: must returns a list of claims or an iterator of claims.
     pub fn claimed_by(&self) -> Option<String> {
         self.claimed_by_module().map(|m| m.name().to_string())
     }
@@ -236,18 +259,16 @@ where
         self.as_inner_ref().required_alignment
     }
 
-    /// Returns claim module raw pointer.
-    pub fn claim_module_ptr(&self) -> *mut spdk_bdev_module {
-        unsafe { self.as_inner_ref().internal.claim.v1.module }
-    }
-
     /// Returns true if this Bdev is claimed by some other component.
     pub fn is_claimed(&self) -> bool {
-        !self.claim_module_ptr().is_null()
+        unsafe {
+            self.as_inner_ref().internal.claim_type != SPDK_BDEV_CLAIM_NONE
+        }
     }
 
     /// Returns true if this Bdev is claimed by the given Bdev module.
     pub fn is_claimed_by_module(&self, module: &BdevModule) -> bool {
+        // TODO: properly walk all claims for v2-type claims.
         self.claimed_by_module()
             .map_or(false, |m| m.name() == module.name())
     }
