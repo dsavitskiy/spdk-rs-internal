@@ -1,18 +1,14 @@
 extern crate bindgen;
 extern crate cc;
 
-use crate::build_helpers::{print_path_var, Error, LibraryConfig};
+use build_helpers::{Error, LibraryConfig};
 use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
 use std::{
     collections::HashSet,
-    env,
-    ffi::OsStr,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
 };
-
-mod build_helpers;
 
 #[derive(Debug)]
 struct MacroCallback {
@@ -31,156 +27,27 @@ impl ParseCallbacks for MacroCallback {
     }
 }
 
-/// Returns package's root dir.
-fn get_root_dir() -> PathBuf {
-    PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-}
-
 /// Returns output dir.
 fn get_out_dir() -> PathBuf {
     PathBuf::from(env::var("OUT_DIR").unwrap())
 }
 
-/// Returns target dir.
-#[allow(dead_code)]
-fn get_target_dir() -> PathBuf {
-    let mut p = get_out_dir();
-    p.pop();
-    p.pop();
-    assert_eq!(p.file_name(), Some(OsStr::new("build")));
-    p.pop();
-    p
-}
-
-/// Returns absolute path for SPDK library.
-fn get_spdk_path() -> Result<PathBuf, Error> {
-    let spdk_path = match env::var_os("SPDK_PATH") {
-        Some(s) => {
-            println!("SPDK_PATH variable is set to {}", s.to_str().unwrap());
-            PathBuf::from(s)
-        }
-        None => {
-            let mut spdk_path = get_root_dir();
-            spdk_path.push("spdk");
-            println!(
-                "SPDK_PATH variable not set, trying {}",
-                spdk_path.to_str().unwrap()
-            );
-            spdk_path
-        }
-    };
-
-    match fs::canonicalize(&spdk_path) {
-        Ok(res) => {
-            println!("SPDK found at {}", res.to_str().unwrap());
-            Ok(res)
-        }
-        Err(e) => Err(Error::Generic(format!(
-            "Bad SPDK path {}: {}",
-            spdk_path.to_str().unwrap(),
-            e
-        ))),
-    }
+/// Returns SPDK root dir.
+fn get_spdk_root_dir() -> PathBuf {
+    PathBuf::from(env::var("SPDK_ROOT_DIR").expect("SPDK_ROOT_DIR must be set"))
 }
 
 /// Finds and configures SPDK library.
-fn configure_spdk() -> Result<LibraryConfig, Error> {
-    let spdk_path = get_spdk_path()?;
-
-    print_path_var("****", "PKG_CONFIG_PATH");
-    print_path_var("****", "PKG_CONFIG_PATH_FOR_TARGET");
+fn spdk_lib_config() -> Result<LibraryConfig, Error> {
+    let spdk_root = get_spdk_root_dir();
+    println!("SPDK root directory: {spdk_root:?}");
 
     let mut spdk_lib = LibraryConfig::new();
 
-    spdk_lib.add_inc(spdk_path.join("include"))?;
-    spdk_lib.add_inc(spdk_path.join("include/spdk_internal"))?;
-
-    spdk_lib.add_inc_alt(
-        spdk_path.join("include/spdk/module"),
-        spdk_path.join("module"),
-    )?;
-    spdk_lib.add_inc_alt(
-        spdk_path.join("include/spdk/lib"),
-        spdk_path.join("lib"),
-    )?;
-
-    spdk_lib.find_pkg_config_dirs(&spdk_path)?;
-
-    spdk_lib.exclude_lib("spdk_bdev_blobfs");
-    spdk_lib.exclude_lib("spdk_bdev_ftl");
-    spdk_lib.exclude_lib("spdk_bdev_gpt");
-    spdk_lib.exclude_lib("spdk_bdev_passthru");
-    spdk_lib.exclude_lib("spdk_bdev_raid");
-    spdk_lib.exclude_lib("spdk_bdev_split");
-    spdk_lib.exclude_lib("spdk_bdev_zone_block");
-    spdk_lib.exclude_lib("spdk_event_nvmf");
-    spdk_lib.exclude_lib("spdk_sock_uring");
-    spdk_lib.exclude_lib("spdk_ut_mock");
-
-    spdk_lib.mark_system("aio");
-    spdk_lib.mark_system("bsd");
-    spdk_lib.mark_system("crypto");
-    spdk_lib.mark_system("dl");
-    spdk_lib.mark_system("m");
-    spdk_lib.mark_system("md");
-    spdk_lib.mark_system("numa");
-    spdk_lib.mark_system("pcap");
-    spdk_lib.mark_system("rt");
-    spdk_lib.mark_system("ssl");
-    spdk_lib.mark_system("uring");
-    spdk_lib.mark_system("uuid");
-
-    spdk_lib.set_static_search(true);
-
-    spdk_lib.find_lib("libdpdk")?;
-
-    spdk_lib.find_libs(&vec![
-        "spdk_accel",
-        "spdk_accel_ioat",
-        "spdk_bdev_aio",
-        // #[cfg(target_arch = "x86_64")]
-        // "spdk_bdev_crypto",
-        "spdk_bdev_delay",
-        "spdk_bdev_error",
-        "spdk_bdev_lvol",
-        "spdk_bdev_malloc",
-        "spdk_bdev_null",
-        "spdk_bdev_nvme",
-        "spdk_bdev_uring",
-        "spdk_bdev_virtio",
-        "spdk_env_dpdk",
-        "spdk_env_dpdk_rpc",
-        "spdk_event",
-        "spdk_event_accel",
-        "spdk_event_bdev",
-        "spdk_event_iscsi",
-        "spdk_event_nbd",
-        "spdk_event_scsi",
-        "spdk_event_sock",
-        "spdk_event_vmd",
-        "spdk_nvmf",
-    ])?;
-
-    spdk_lib.find_lib("spdk_syslibs")?;
-
-    spdk_lib.dump();
-
-    /*
-    println!("Merging SPDK static libraries into a shared library...");
-    let lib_name = OsStr::new("spdk-bundle");
-    let lib_dir = get_target_dir();
-    let lib_path = spdk_lib.build_shared_lib(&lib_dir, lib_name)?;
-
-    println!("cargo:rustc-link-lib=dylib={}", lib_name.to_str().unwrap());
-    println!("cargo:root={}", lib_dir.to_str().unwrap());
-    println!("cargo:lib_path={}", lib_path.to_str().unwrap());
-     */
-
-    println!("Link against static SPDK...");
-    spdk_lib.cargo();
-
-    println!("cargo:rerun-if-env-changed=SPDK_PATH");
-    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH_FOR_TARGET");
+    spdk_lib.add_inc(spdk_root.join("include"))?;
+    spdk_lib.add_inc(spdk_root.join("include/spdk_internal"))?;
+    spdk_lib.add_inc(spdk_root.join("module"))?;
+    spdk_lib.add_inc(spdk_root.join("lib"))?;
 
     Ok(spdk_lib)
 }
@@ -229,14 +96,14 @@ where
 fn main() {
     #![allow(unreachable_code)]
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-    panic!("spdk-rs crate is only for x86_64 (Nehalem or later) and aarch64 (with crypto) ISAs.");
+    panic!("Rust support crate is only for x86_64 (Nehalem or later) and aarch64 (with crypto) ISAs.");
 
     #[cfg(not(target_os = "linux"))]
-    panic!("spdk-rs crate works only on linux");
+    panic!("Rust support crate works only on linux");
 
     // Configure SPDK library.
     println!("\nConfiguring SPDK library...");
-    let spdk_lib = match configure_spdk() {
+    let spdk_lib = match spdk_lib_config() {
         Ok(c) => {
             println!("Successfully configured SPDK library");
             c
@@ -264,7 +131,11 @@ fn main() {
     // Generate Rust bindings for SPDK.
     let clang_args: Vec<String> = inc_dirs
         .iter()
-        .map(|p| format!("-I{}", p.to_str().unwrap()))
+        .map(|p| {
+            let s = p.to_str().unwrap();
+            println!("cargo:rerun-if-changed={s}");
+            format!("-I{s}")
+        })
         .collect();
 
     let macros = Arc::new(RwLock::new(HashSet::new()));
@@ -328,9 +199,7 @@ fn main() {
         .prepend_enum_name(false)
         .size_t_is_usize(false)
         .generate_inline_functions(true)
-        .parse_callbacks(Box::new(MacroCallback {
-            macros,
-        }));
+        .parse_callbacks(Box::new(MacroCallback { macros }));
 
     #[cfg(target_arch = "x86_64")]
     let bindings = bindings.clang_arg("-march=nehalem");

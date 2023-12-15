@@ -126,7 +126,7 @@ impl BdevModule {
     /// # Arguments
     ///
     /// * `ptr`: Module name to look up by.
-    pub(crate) fn from_ptr(ptr: *mut spdk_bdev_module) -> Self {
+    pub fn from_ptr(ptr: *mut spdk_bdev_module) -> Self {
         Self {
             inner: NonNull::new(ptr).unwrap(),
         }

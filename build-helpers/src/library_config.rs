@@ -20,7 +20,6 @@ fn get_path_var<V: AsRef<OsStr>>(var_name: V) -> Vec<PathBuf> {
 }
 
 /// Prints contents of a PATH-like environment variable.
-#[allow(dead_code)]
 pub fn print_path_var<V: AsRef<OsStr>>(prefix: &str, var: V) {
     let svar = OsString::from(&var);
     match env::var_os(&var) {
@@ -40,7 +39,6 @@ pub fn print_path_var<V: AsRef<OsStr>>(prefix: &str, var: V) {
 /// second variable is not found in the first one, it is appended to the end of
 /// the first. If the first one already has the same item as the second one, it
 /// is ignored. The original order of items is preserved.
-#[allow(dead_code)]
 pub fn merge_path_var<U: AsRef<OsStr>, V: AsRef<OsStr>>(first: U, second: V) {
     let mut a = get_path_var(&first);
     let mut ex = BTreeSet::new();
@@ -60,7 +58,6 @@ pub fn merge_path_var<U: AsRef<OsStr>, V: AsRef<OsStr>>(first: U, second: V) {
 }
 
 /// Appends a new path to a PATH-like environment variable.
-#[allow(dead_code)]
 pub fn append_path_var<V: AsRef<OsStr>>(var_name: V, new_path: &Path) {
     let mut lst = get_path_var(&var_name);
     lst.push(PathBuf::from(&new_path));
@@ -204,7 +201,7 @@ pub struct LibraryConfig {
     /// Libraries treated as system.
     marked_system: BTreeSet<OsString>,
     /// Found library dependencies.
-    libs: BTreeSet<Library>,
+    pub libs: BTreeSet<Library>,
     /// Found library paths.
     lib_paths: BTreeSet<PathBuf>,
     /// Found include paths.
@@ -222,7 +219,6 @@ impl LibraryConfig {
 
     /// Adds a new pkg_config search path. The path must exist on the file
     /// system.
-    #[allow(dead_code)]
     pub fn add_pkg_cfg_path<T: AsRef<Path>>(
         &self,
         new_path: T,
@@ -245,7 +241,6 @@ impl LibraryConfig {
     }
 
     /// Searches the file system for directories that contain .pc files.
-    #[allow(dead_code)]
     pub fn find_pkg_config_dirs<T: AsRef<Path>>(
         &mut self,
         root_dir: T,
@@ -350,13 +345,11 @@ impl LibraryConfig {
     }
 
     /// Returns list of include directories.
-    #[allow(dead_code)]
     pub fn get_inc_paths(&self) -> Vec<PathBuf> {
         self.inc_paths.iter().map(PathBuf::from).collect()
     }
 
     /// Outputs cargo derictives to link to the found libraries.
-    #[allow(dead_code)]
     pub fn cargo(&self) {
         for s in &self.lib_paths {
             println!("cargo:rustc-link-search={}", s.to_str().unwrap());
@@ -368,7 +361,6 @@ impl LibraryConfig {
     }
 
     /// TODO
-    #[allow(dead_code)]
     pub fn dump(&self) {
         println!("**** Found libraries:");
         for lib in self.libs.iter() {
@@ -387,7 +379,6 @@ impl LibraryConfig {
     }
 
     /// Builds a shared (.so) library from all the libraries found previously.
-    #[allow(dead_code)]
     pub fn build_shared_lib(
         &self,
         out_dir: &Path,

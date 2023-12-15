@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
+use pkg_config;
 
-/// TODO
-#[allow(dead_code)]
+/// Build helpers' errors.
 pub enum Error {
     /// Error from `pkg_config` crate.
     PkgConfig(pkg_config::Error),

@@ -1,0 +1,13 @@
+[package]
+name = "build-helpers"
+description = "Build helpers for Rust bindings"
+version = "0.1.0"
+edition = "2018"
+license = "MIT"
+authors = [
+  "Dmitry Savitskiy <dmitry.savitsky@mayadata.io>",
+]
+
+[dependencies]
+cc = "1.0.83"
+pkg-config = "0.3.27"
